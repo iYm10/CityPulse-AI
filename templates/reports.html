@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Reports | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">STAKEHOLDER OUTPUT</span>
+        <h1>📄 Executive Reports</h1>
+        <p>Turn completed assessments into a clear city summary.</p>
+    </div>
+
+    <span class="chip">{{ results|length }} assessment(s)</span>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi">
+        <span>City</span>
+        <strong>{{ profile.get('city_name','—') }}</strong>
+        <small>{{ profile.get('country','') }}</small>
+    </article>
+
+    <article class="kpi">
+        <span>Assessments</span>
+        <strong>{{ results|length }}</strong>
+        <small>Current session</small>
+    </article>
+
+    <article class="kpi">
+        <span>Report status</span>
+        <strong>{{ "Ready" if results else "Waiting" }}</strong>
+        <small>Executive HTML report</small>
+    </article>
+</section>
+
+{% if waste %}
+<section class="panel">
+    <h2>{{ waste.headline }}</h2>
+    <p>
+        The expected collection volume is
+        <strong>{{ "{:,.0f}".format(waste.prediction) }} tons</strong>
+        in {{ waste.borough }}, District {{ waste.district }},
+        for {{ waste.month_name }} {{ waste.year }}.
+    </p>
+
+    {% for title,text in waste.actions %}
+        <div class="action">
+            <span>{{ loop.index }}</span>
+            <div>
+                <strong>{{ title }}</strong>
+                <p>{{ text }}</p>
+            </div>
+        </div>
+    {% endfor %}
+
+    <a class="button" href="{{ url_for('download_report') }}">Download executive report</a>
+</section>
+{% else %}
+<section class="empty-state">
+    <div>📋</div>
+    <h3>No report content yet</h3>
+    <p>Complete a smart-city assessment first.</p>
+</section>
+{% endif %}
+{% endblock %}

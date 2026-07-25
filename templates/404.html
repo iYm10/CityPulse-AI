@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Page not found | CityPulse AI{% endblock %}
+{% block content %}
+<section class="empty-state">
+    <div>404</div>
+    <h1>Page not found</h1>
+    <p>The requested page does not exist.</p>
+    <a class="button" href="{{ url_for('index') }}">Return home</a>
+</section>
+{% endblock %}

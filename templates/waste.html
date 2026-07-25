@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Waste Planning | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">LIVE FORECAST</span>
+        <h1>♻️ Waste Planning</h1>
+        <p>
+            Forecast monthly collection demand and turn it into
+            a clear resource-planning decision.
+        </p>
+    </div>
+
+    <span class="chip {{ 'live' if model_ready else 'waiting' }}">
+        {{ "Model connected" if model_ready else "Model not connected" }}
+    </span>
+</section>
+
+{% if not model_ready %}
+<section class="empty-state">
+    <div>📦</div>
+    <h3>Add the waste model bundle</h3>
+    <p>
+        Place <code>waste_bundle.joblib</code> inside the models folder,
+        then redeploy the service.
+    </p>
+
+    {% if model_error %}
+        <pre>{{ model_error }}</pre>
+    {% endif %}
+</section>
+{% else %}
+<form class="panel prediction-form" method="post">
+    <div class="step"><b>1</b><span>Planning area</span></div>
+    <div class="step"><b>2</b><span>Recent demand</span></div>
+    <div class="step"><b>3</b><span>Forecast period</span></div>
+
+    <label>
+        Borough
+        <select name="borough">
+            {% for item in ["Bronx","Brooklyn","Manhattan","Queens","Staten Island"] %}
+                <option>{{ item }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Community district
+        <input type="number" name="district" value="1" min="1" max="20">
+    </label>
+
+    <label>
+        Two months ago (tons)
+        <input type="number" name="two_months" value="3900" min="0" step="50">
+    </label>
+
+    <label>
+        Last month (tons)
+        <input type="number" name="last_month" value="4000" min="0" step="50">
+    </label>
+
+    <label>
+        Forecast month
+        <select name="month">
+            {% for number,name in months %}
+                <option value="{{ number }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Forecast year
+        <input type="number" name="year" value="2026" min="2000" max="2035">
+    </label>
+
+    <button class="full" type="submit">Generate monthly waste plan</button>
+</form>
+{% endif %}
+
+{% if result %}
+<section class="decision-card">
+    <span>MONTHLY PLANNING OUTLOOK</span>
+    <h2>{{ result.headline }}</h2>
+    <p>
+        {{ result.borough }}, District {{ result.district }} ·
+        {{ result.month_name }} {{ result.year }} ·
+        Priority: {{ result.priority }}
+    </p>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi">
+        <span>Expected collection</span>
+        <strong>{{ "{:,.0f}".format(result.prediction) }}</strong>
+        <small>tons</small>
+    </article>
+
+    <article class="kpi">
+        <span>Change</span>
+        <strong>{{ "{:+.1f}".format(result.change_percent) }}%</strong>
+        <small>{{ "{:+,.0f}".format(result.difference) }} tons</small>
+    </article>
+
+    <article class="kpi">
+        <span>Status</span>
+        <strong>{{ result.status }}</strong>
+        <small>Operational outlook</small>
+    </article>
+
+    <article class="kpi">
+        <span>Period</span>
+        <strong>{{ result.month_name }}</strong>
+        <small>{{ result.year }}</small>
+    </article>
+</section>
+
+<section class="result-grid">
+    <article class="panel">
+        <h3>Why it matters</h3>
+        <p>{{ result.summary }}</p>
+
+        <h3>Recommended actions</h3>
+
+        {% for title,text in result.actions %}
+            <div class="action">
+                <span>{{ loop.index }}</span>
+                <div>
+                    <strong>{{ title }}</strong>
+                    <p>{{ text }}</p>
+                </div>
+            </div>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Demand movement</h3>
+        <canvas id="wasteChart"></canvas>
+    </article>
+</section>
+
+<script>
+window.cityPulseWasteData = {
+    labels: ["Two months ago", "Last month", "Forecast"],
+    values: [{{ result.two_months }}, {{ result.last_month }}, {{ result.prediction }}]
+};
+</script>
+{% endif %}
+{% endblock %}

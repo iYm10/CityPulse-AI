@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Profile | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">WORKSPACE</span>
+        <h1>👤 Profile</h1>
+        <p>Review the current user and city identity.</p>
+    </div>
+
+    <span class="chip">{{ profile.get('role','City user') }}</span>
+</section>
+
+<section class="two-grid">
+    <article class="panel">
+        <h2>User</h2>
+        <p><strong>Name:</strong> {{ user_name }}</p>
+        <p><strong>Email:</strong> {{ user_email }}</p>
+        <p><strong>Role:</strong> {{ profile.get('role') }}</p>
+    </article>
+
+    <article class="panel">
+        <h2>City</h2>
+        <p><strong>City:</strong> {{ profile.get('city_name') }}</p>
+        <p><strong>Country:</strong> {{ profile.get('country') }}</p>
+        <p><strong>Population:</strong> {{ "{:,}".format(profile.get('population',0)) }}</p>
+        <p><strong>Districts:</strong> {{ profile.get('districts') }}</p>
+    </article>
+</section>
+
+<div class="button-row">
+    <a class="button" href="{{ url_for('city_profile') }}">Edit city profile</a>
+    <a class="button secondary" href="{{ url_for('logout') }}">Log out</a>
+</div>
+{% endblock %}

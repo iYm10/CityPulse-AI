@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}City Profile | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">CITY SETUP</span>
+        <h1>Create the city workspace</h1>
+        <p>Define the city identity, planning scale, and strategic focus.</p>
+    </div>
+    <span class="chip">Step 1 of 1</span>
+</section>
+
+<form class="panel form-grid" method="post">
+    <div class="section-title">City identity</div>
+
+    <label>
+        City name
+        <input name="city_name" value="{{ profile.get('city_name','') }}" placeholder="Jeddah" required>
+    </label>
+
+    <label>
+        Country
+        <input name="country" value="{{ profile.get('country','') }}" placeholder="Saudi Arabia" required>
+    </label>
+
+    <label>
+        Your role
+        <select name="role">
+            {% for role in ["City Manager","Data Analyst","Transportation Department","Energy Department","Public Services Department","Waste Management Department"] %}
+                <option {% if profile.get('role') == role %}selected{% endif %}>{{ role }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Population
+        <input type="number" name="population" value="{{ profile.get('population',100000) }}" min="0">
+    </label>
+
+    <label>
+        Number of districts
+        <input type="number" name="districts" value="{{ profile.get('districts',10) }}" min="1">
+    </label>
+
+    <label>
+        Preferred language
+        <select name="language">
+            <option>English</option>
+            <option>Arabic</option>
+        </select>
+    </label>
+
+    <div class="section-title full">Strategic focus</div>
+
+    <div class="check-grid full">
+        {% for goal in ["Improve Transportation","Reduce Energy Use","Improve Public Services","Improve Waste Collection","Improve Quality of Life","Reduce Environmental Problems"] %}
+            <label class="check">
+                <input type="checkbox" name="goals" value="{{ goal }}">
+                {{ goal }}
+            </label>
+        {% endfor %}
+    </div>
+
+    <div class="section-title full">Enabled workspaces</div>
+
+    <div class="check-grid full">
+        {% for module in ["Transportation","Energy","Public Services","Waste Management"] %}
+            <label class="check">
+                <input type="checkbox" name="selected_modules" value="{{ module }}" checked>
+                {{ module }}
+            </label>
+        {% endfor %}
+    </div>
+
+    <button class="full" type="submit">Enter city workspace</button>
+</form>
+{% endblock %}

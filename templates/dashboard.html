@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | CityPulse AI{% endblock %}
+{% block content %}
+<section class="hero">
+    <div>
+        <span class="eyebrow">WELCOME, {{ user_name|upper }}</span>
+        <h1>{{ profile.city_name }} Command Center</h1>
+        <p>
+            A premium executive view of city performance, model availability,
+            completed assessments, and recommended actions.
+        </p>
+        <span class="hero-badge">
+            {{ model_status.values()|select('equalto', true)|list|length }} of 4 models connected
+        </span>
+    </div>
+
+    <div class="hero-orb">AI</div>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi">
+        <span>Population</span>
+        <strong>{{ "{:,}".format(profile.population) }}</strong>
+        <small>City profile</small>
+    </article>
+
+    <article class="kpi">
+        <span>Districts</span>
+        <strong>{{ profile.districts }}</strong>
+        <small>Planning areas</small>
+    </article>
+
+    <article class="kpi">
+        <span>Assessments</span>
+        <strong>{{ results|length }}</strong>
+        <small>Current session</small>
+    </article>
+
+    <article class="kpi">
+        <span>Latest priority</span>
+        <strong>{{ waste.priority if waste else "Not assessed" }}</strong>
+        <small>Based on model output</small>
+    </article>
+</section>
+
+<div class="section-heading">
+    <div>
+        <span class="eyebrow dark">WORKSPACES</span>
+        <h2>Smart-city modules</h2>
+    </div>
+</div>
+
+<section class="module-grid">
+    {% set modules = [
+        ("🚦","Transportation","Anticipate higher-risk conditions and support safer mobility planning.","transportation"),
+        ("⚡","Energy","Forecast building demand and prepare for peak consumption periods.","energy"),
+        ("🏛️","Public Services","Identify service requests that may need earlier attention.","governance"),
+        ("♻️","Waste Planning","Forecast monthly collection demand and create an operational plan.","waste")
+    ] %}
+
+    {% for icon,title,text,key in modules %}
+        <a class="module-card" href="{{ url_for('public_services') if key == 'governance' else url_for(key) }}">
+            <div class="module-icon">{{ icon }}</div>
+            <h3>{{ title }}</h3>
+            <p>{{ text }}</p>
+            <span class="status {{ 'live' if model_status[key] else 'waiting' }}">
+                {{ "Model connected" if model_status[key] else "Setup needed" }}
+            </span>
+        </a>
+    {% endfor %}
+</section>
+
+<div class="section-heading">
+    <div>
+        <span class="eyebrow dark">EXECUTIVE BRIEF</span>
+        <h2>Latest operational outlook</h2>
+    </div>
+</div>
+
+{% if waste %}
+<section class="decision-card">
+    <span>MONTHLY PLANNING OUTLOOK</span>
+    <h2>{{ waste.headline }}</h2>
+    <p>
+        {{ waste.borough }}, District {{ waste.district }} ·
+        {{ waste.month_name }} {{ waste.year }} ·
+        Expected {{ "{:,.0f}".format(waste.prediction) }} tons
+    </p>
+    <a class="button light" href="{{ url_for('advisor') }}">Ask the AI advisor</a>
+</section>
+{% else %}
+<section class="empty-state">
+    <div>✨</div>
+    <h3>Start the first city assessment</h3>
+    <p>
+        Run a smart-city module to create a forecast, priority level,
+        and recommended action plan.
+    </p>
+</section>
+{% endif %}
+{% endblock %}

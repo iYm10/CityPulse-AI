@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Welcome | CityPulse AI{% endblock %}
+{% block main_class %}auth-shell{% endblock %}
+{% block content %}
+<section class="auth-visual">
+    <div class="eyebrow">SMART CITY DECISION SUPPORT</div>
+    <h1>Turn city data into clear action.</h1>
+    <p>
+        Forecast needs, understand priorities, and prepare practical operational
+        plans in one intelligent workspace.
+    </p>
+
+    <div class="feature-list">
+        <div>✓ Four smart-city workspaces</div>
+        <div>✓ Stakeholder-ready forecasts and action plans</div>
+        <div>✓ AI guidance based on model results</div>
+    </div>
+</section>
+
+<section class="auth-card">
+    <div class="brand large">
+        <span class="brand-mark">CP</span>
+        <span>CityPulse AI</span>
+    </div>
+
+    <h2>Welcome</h2>
+    <p class="muted">Access your city intelligence workspace.</p>
+
+    <div class="tabs">
+        <button class="tab active" type="button" data-tab="signin">Sign in</button>
+        <button class="tab" type="button" data-tab="create">Create account</button>
+    </div>
+
+    <form id="signin" class="tab-panel active" method="post">
+        <input type="hidden" name="mode" value="signin">
+        <label>
+            Work email
+            <input type="email" name="email" placeholder="name@city.gov" required>
+        </label>
+        <label>
+            Password
+            <input type="password" name="password" required>
+        </label>
+        <button type="submit">Continue</button>
+    </form>
+
+    <form id="create" class="tab-panel" method="post">
+        <input type="hidden" name="mode" value="create">
+        <label>
+            Full name
+            <input type="text" name="name" required>
+        </label>
+        <label>
+            Work email
+            <input type="email" name="email" placeholder="name@city.gov" required>
+        </label>
+        <label>
+            Create password
+            <input type="password" name="password" required>
+        </label>
+        <button type="submit">Create workspace</button>
+    </form>
+
+    <small>Prototype authentication. Connect a real database before production use.</small>
+</section>
+{% endblock %}

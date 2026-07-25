@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ module }} | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">SMART CITY MODULE</span>
+        <h1>{{ icon }} {{ module }}</h1>
+        <p>This stakeholder experience is ready for the exact model inputs and feature pipeline.</p>
+    </div>
+
+    <span class="chip {{ 'live' if model_status.get(module_key) else 'waiting' }}">
+        {{ "Model connected" if model_status.get(module_key) else "Model integration" }}
+    </span>
+</section>
+
+<section class="empty-state">
+    <div>{{ icon }}</div>
+    <h3>{{ module }} workspace is ready</h3>
+    <p>
+        Add the trained model bundle to the models folder,
+        then connect its exact training features in app.py.
+    </p>
+</section>
+
+<section class="three-grid">
+    <article class="panel">
+        <span class="number">01</span>
+        <h3>What will happen?</h3>
+        <p>A clear prediction or risk outlook.</p>
+    </article>
+
+    <article class="panel">
+        <span class="number">02</span>
+        <h3>Why does it matter?</h3>
+        <p>A stakeholder-friendly explanation.</p>
+    </article>
+
+    <article class="panel">
+        <span class="number">03</span>
+        <h3>What should the city do?</h3>
+        <p>A practical operational recommendation.</p>
+    </article>
+</section>
+{% endblock %}

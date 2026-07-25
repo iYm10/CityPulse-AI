@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}AI Advisor | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">DECISION SUPPORT</span>
+        <h1>✨ AI City Advisor</h1>
+        <p>Ask about completed assessments and receive a clear explanation or action plan.</p>
+    </div>
+
+    <span class="chip live">Smart guidance</span>
+</section>
+
+<section class="quick-grid">
+    {% for q in ["What is the main city priority?","Create a simple action plan for the latest result.","Explain why the latest result matters to the city."] %}
+        <form method="post">
+            <input type="hidden" name="question" value="{{ q }}">
+            <button>{{ q }}</button>
+        </form>
+    {% endfor %}
+</section>
+
+<section class="chat-panel">
+    {% if not messages %}
+        <div class="message assistant">
+            Hello. Complete a city assessment, then ask me to explain
+            the result or prepare next actions.
+        </div>
+    {% endif %}
+
+    {% for message in messages %}
+        <div class="message {{ message.role }}">
+            <div>{{ message.content|replace('\n','<br>')|safe }}</div>
+            {% if message.source %}
+                <small>{{ message.source }}</small>
+            {% endif %}
+        </div>
+    {% endfor %}
+</section>
+
+<form class="chat-form" method="post">
+    <input name="question" placeholder="Ask CityPulse about the city" required>
+    <button>Send</button>
+</form>
+{% endblock %}
