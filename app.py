@@ -429,6 +429,202 @@ def generic_model_page(module_name, module_title, icon, subtitle):
     )
 
 
+
+def get_transportation_bundle():
+    bundle = MODEL_BUNDLES.get("transportation")
+
+    if not isinstance(bundle, dict):
+        return None
+
+    required_keys = {
+        "stage1_model",
+        "stage2_model",
+        "feature_columns",
+    }
+
+    if not required_keys.issubset(bundle):
+        return None
+
+    if not hasattr(bundle["stage1_model"], "predict"):
+        return None
+
+    if not hasattr(bundle["stage2_model"], "predict"):
+        return None
+
+    return bundle
+
+
+def transportation_model_ready():
+    bundle = get_transportation_bundle()
+    return bundle is not None and bool(bundle.get("feature_columns"))
+
+
+def prepare_transportation_input(form_data):
+    bundle = get_transportation_bundle()
+
+    if not transportation_model_ready():
+        raise ValueError(
+            "Transportation bundle must contain stage1_model, "
+            "stage2_model, and feature_columns."
+        )
+
+    feature_columns = [str(column) for column in bundle["feature_columns"]]
+    row = {feature: 0 for feature in feature_columns}
+
+    numeric_defaults = {
+        "air_co": 0,
+        "air_nox": 40,
+        "air_no2": 30,
+        "air_no": 10,
+        "air_o3": 40,
+        "air_air_temp": 15,
+        "latitude": 51.5074,
+        "longitude": -0.1278,
+        "weather_tavg": 15,
+        "weather_tmin": 10,
+        "weather_tmax": 20,
+        "weather_prcp": 0,
+        "weather_wdir": 180,
+        "weather_wspd": 10,
+        "weather_pres": 1013,
+        "bike_cnt": 1000,
+        "bike_t1": 15,
+        "bike_t2": 14,
+        "bike_hum": 70,
+        "bike_wind_speed": 10,
+        "bike_weather_code": 1,
+        "bike_is_holiday": 0,
+        "year": 2026,
+        "month": 1,
+        "hour": 12,
+        "day_of_week": 0,
+        "is_weekend": 0,
+    }
+
+    integer_features = {
+        "bike_is_holiday",
+        "year",
+        "month",
+        "hour",
+        "day_of_week",
+        "is_weekend",
+    }
+
+    submitted_values = {}
+
+    for feature_name, default_value in numeric_defaults.items():
+        raw_value = form_data.get(feature_name, "")
+        if raw_value is None or str(raw_value).strip() == "":
+            raw_value = default_value
+
+        value = (
+            int(float(raw_value))
+            if feature_name in integer_features
+            else float(raw_value)
+        )
+
+        submitted_values[feature_name] = value
+
+        if feature_name in row:
+            row[feature_name] = value
+
+    categorical_values = {
+        "site": form_data.get("site", "London Bloomsbury"),
+        "code": form_data.get("code", "CLL2"),
+        "site_type": form_data.get("site_type", "Urban Background"),
+        "season": form_data.get("season", "Winter"),
+    }
+
+    for prefix, selected_value in categorical_values.items():
+        selected_column = f"{prefix}_{selected_value}"
+
+        if selected_column not in row:
+            available_values = [
+                column[len(prefix) + 1:]
+                for column in feature_columns
+                if column.startswith(f"{prefix}_")
+            ]
+            raise ValueError(
+                f"Unsupported {prefix} value: {selected_value}. "
+                f"Available values: {', '.join(available_values)}"
+            )
+
+        row[selected_column] = 1
+        submitted_values[prefix] = selected_value
+
+    prepared_data = pd.DataFrame(
+        [row],
+        columns=feature_columns,
+    ).apply(pd.to_numeric, errors="raise")
+
+    return prepared_data, submitted_values
+
+
+def run_transportation_prediction(form_data):
+    bundle = get_transportation_bundle()
+
+    if not transportation_model_ready():
+        raise ValueError("Transportation model is not connected.")
+
+    prepared_data, submitted_values = prepare_transportation_input(form_data)
+
+    stage1_model = bundle["stage1_model"]
+    stage2_model = bundle["stage2_model"]
+    threshold = float(bundle.get("classification_threshold", 0.5))
+
+    if hasattr(stage1_model, "predict_proba"):
+        probability = float(
+            stage1_model.predict_proba(prepared_data)[0][-1]
+        )
+    else:
+        probability = float(stage1_model.predict(prepared_data)[0])
+        probability = max(0.0, min(1.0, probability))
+
+    collision_expected = probability >= threshold
+
+    if collision_expected:
+        predicted_count = float(stage2_model.predict(prepared_data)[0])
+        predicted_count = max(0.0, predicted_count)
+    else:
+        predicted_count = 0.0
+
+    probability_percent = probability * 100
+
+    if probability_percent >= 70:
+        risk_level = "High"
+        status = "Immediate traffic-safety attention recommended"
+    elif probability_percent >= 40:
+        risk_level = "Moderate"
+        status = "Preventive monitoring recommended"
+    else:
+        risk_level = "Low"
+        status = "Normal monitoring is sufficient"
+
+    return {
+        "module": "Transportation",
+        "prediction": predicted_count,
+        "probability": probability,
+        "probability_percent": probability_percent,
+        "collision_expected": collision_expected,
+        "predicted_collision_count": predicted_count,
+        "threshold": threshold,
+        "risk_level": risk_level,
+        "status": status,
+        "headline": (
+            f"Approximately {predicted_count:.1f} collisions expected"
+            if collision_expected
+            else "Low probability of collision activity"
+        ),
+        "target_name": bundle.get("target", "collision_count"),
+        "model_name": bundle.get("model_name", "Two-stage LightGBM"),
+        "task_type": bundle.get("task", "hurdle_regression"),
+        "unit": bundle.get("unit", "collisions"),
+        "inputs": submitted_values,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
+
 def get_energy_bundle():
     bundle = MODEL_BUNDLES.get("energy")
 
@@ -893,11 +1089,53 @@ def dashboard():
 
 @app.route("/transportation", methods=["GET", "POST"])
 def transportation():
-    return generic_model_page(
-        module_name="transportation",
-        module_title="Transportation",
-        icon="🚦",
-        subtitle="Use the connected model to generate a mobility or road-risk prediction.",
+    if not logged_in():
+        return redirect(url_for("login"))
+
+    if not profile_ready():
+        return redirect(url_for("city_profile"))
+
+    result = session.get("transportation_result")
+    bundle = get_transportation_bundle()
+
+    feature_columns = (
+        [str(column) for column in bundle.get("feature_columns", [])]
+        if bundle
+        else []
+    )
+
+    def category_options(prefix):
+        return [
+            column[len(prefix) + 1:]
+            for column in feature_columns
+            if column.startswith(f"{prefix}_")
+        ]
+
+    if request.method == "POST":
+        try:
+            result = run_transportation_prediction(request.form)
+            session["transportation_result"] = result
+
+            history = session.get("prediction_history", [])
+            history.append(result)
+            session["prediction_history"] = history[-20:]
+
+            flash(
+                "Transportation assessment generated successfully.",
+                "success",
+            )
+        except Exception as error:
+            flash(str(error), "error")
+
+    return render_template(
+        "transportation.html",
+        result=result,
+        model_ready=transportation_model_ready(),
+        model_error=MODEL_ERRORS.get("transportation"),
+        site_options=category_options("site"),
+        code_options=category_options("code"),
+        site_type_options=category_options("site_type"),
+        season_options=category_options("season"),
     )
 
 
