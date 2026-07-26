@@ -64,7 +64,7 @@
             <h3>{{ title }}</h3>
             <p>{{ text }}</p>
             <span class="status {{ 'live' if model_status[key] else 'waiting' }}">
-                {{ "Model connected" if model_status[key] else "Setup needed" }}
+                {{ "Model connected" if model_status[key] else "Model not connected" }}
             </span>
         </a>
     {% endfor %}
