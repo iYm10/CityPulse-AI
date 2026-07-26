@@ -4,11 +4,11 @@
 {% block content %}
 <section class="page-head">
     <div>
-        <span class="eyebrow dark">LIVE RISK ASSESSMENT</span>
+        <span class="eyebrow dark">LIVE TRANSPORTATION ASSESSMENT</span>
         <h1>🚦 Transportation Intelligence</h1>
         <p>
             Estimate collision probability and expected collision count using
-            air quality, weather, cycling activity, location, and time.
+            the exact features stored in the trained two-stage model bundle.
         </p>
     </div>
 
@@ -20,19 +20,17 @@
 {% if not model_ready %}
 <section class="empty-state">
     <div>🚦</div>
-    <h3>Transportation model is unavailable</h3>
+    <h3>Transportation model could not be connected</h3>
     <p>
-        The application must load both <code>stage1_model</code> and
-        <code>stage2_model</code> from
-        <code>models/transportation_bundle.joblib</code>.
+        Confirm that <code>models/transportation_bundle.joblib</code>
+        contains <code>stage1_model</code>, <code>stage2_model</code>,
+        and <code>feature_columns</code>.
     </p>
-    {% if model_error %}
-        <pre>{{ model_error }}</pre>
-    {% endif %}
+    {% if model_error %}<pre>{{ model_error }}</pre>{% endif %}
 </section>
 {% else %}
 
-<form class="panel prediction-form" method="post">
+<form class="panel form-grid" method="post">
     <div class="section-title full">Air quality</div>
 
     <label>CO
@@ -69,8 +67,8 @@
         <input type="number" step="any" name="weather_prcp" value="0" required>
     </label>
     <label>Wind direction
-        <input type="number" step="any" name="weather_wdir" value="180"
-               min="0" max="360" required>
+        <input type="number" step="any" name="weather_wdir"
+               value="180" min="0" max="360" required>
     </label>
     <label>Wind speed
         <input type="number" step="any" name="weather_wspd" value="10" required>
@@ -82,8 +80,8 @@
     <div class="section-title full">Cycling activity</div>
 
     <label>Bike count
-        <input type="number" step="any" name="bike_cnt" value="1000"
-               min="0" required>
+        <input type="number" step="any" name="bike_cnt"
+               value="1000" min="0" required>
     </label>
     <label>Bike temperature 1
         <input type="number" step="any" name="bike_t1" value="15" required>
@@ -92,19 +90,19 @@
         <input type="number" step="any" name="bike_t2" value="14" required>
     </label>
     <label>Humidity
-        <input type="number" step="any" name="bike_hum" value="70"
-               min="0" max="100" required>
+        <input type="number" step="any" name="bike_hum"
+               value="70" min="0" max="100" required>
     </label>
     <label>Bike wind speed
         <input type="number" step="any" name="bike_wind_speed"
                value="10" required>
     </label>
-    <label>Weather code
+    <label>Bike weather code
         <input type="number" step="any" name="bike_weather_code"
                value="1" required>
     </label>
     <label>Holiday
-        <select name="bike_is_holiday">
+        <select name="bike_is_holiday" required>
             <option value="0">No</option>
             <option value="1">Yes</option>
         </select>
@@ -122,48 +120,34 @@
     </label>
 
     <label>Monitoring site
-        <select name="site">
-            <option>London Bexley</option>
-            <option selected>London Bloomsbury</option>
-            <option>London Eltham</option>
-            <option>London Haringey Priory Park South</option>
-            <option>London Harlington</option>
-            <option>London Hillingdon</option>
-            <option>London Marylebone Road</option>
-            <option>London N. Kensington</option>
-            <option>London Westminster</option>
+        <select name="site" required>
+            {% for option in site_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
         </select>
     </label>
 
     <label>Site code
-        <select name="code">
-            <option>BEX</option>
-            <option selected>CLL2</option>
-            <option>HG4</option>
-            <option>HIL</option>
-            <option>HORS</option>
-            <option>HRL</option>
-            <option>KC1</option>
-            <option>LON6</option>
-            <option>MY1</option>
+        <select name="code" required>
+            {% for option in code_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
         </select>
     </label>
 
     <label>Site type
-        <select name="site_type">
-            <option>Suburban Background</option>
-            <option selected>Urban Background</option>
-            <option>Urban Industrial</option>
-            <option>Urban Traffic</option>
+        <select name="site_type" required>
+            {% for option in site_type_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
         </select>
     </label>
 
     <label>Season
-        <select name="season">
-            <option>Autumn</option>
-            <option>Spring</option>
-            <option>Summer</option>
-            <option selected>Winter</option>
+        <select name="season" required>
+            {% for option in season_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
         </select>
     </label>
 
@@ -180,7 +164,7 @@
                min="0" max="23" required>
     </label>
     <label>Day of week
-        <select name="day_of_week">
+        <select name="day_of_week" required>
             <option value="0">Monday</option>
             <option value="1">Tuesday</option>
             <option value="2">Wednesday</option>
@@ -191,7 +175,7 @@
         </select>
     </label>
     <label>Weekend
-        <select name="is_weekend">
+        <select name="is_weekend" required>
             <option value="0">No</option>
             <option value="1">Yes</option>
         </select>
@@ -207,22 +191,19 @@
 <section class="decision-card">
     <span>TRANSPORTATION RISK OUTLOOK</span>
     <h2>{{ result.headline }}</h2>
-    <p>
-        Risk level: {{ result.risk_level }} ·
-        {{ result.status }}
-    </p>
+    <p>{{ result.risk_level }} risk · {{ result.status }}</p>
 </section>
 
 <section class="kpi-grid">
     <article class="kpi">
         <span>Collision probability</span>
-        <strong>{{ "{:.1f}".format(result.probability_percent) }}%</strong>
+        <strong>{{ "%.1f"|format(result.probability_percent) }}%</strong>
         <small>Stage 1 classifier</small>
     </article>
 
     <article class="kpi">
         <span>Expected collisions</span>
-        <strong>{{ "{:.1f}".format(result.predicted_collision_count) }}</strong>
+        <strong>{{ "%.1f"|format(result.predicted_collision_count) }}</strong>
         <small>{{ result.unit }}</small>
     </article>
 
@@ -235,35 +216,7 @@
     <article class="kpi">
         <span>Model</span>
         <strong>{{ result.model_name }}</strong>
-        <small>Two-stage hurdle model</small>
-    </article>
-</section>
-
-<section class="three-grid">
-    <article class="panel">
-        <span class="number">01</span>
-        <h3>What may happen?</h3>
-        <p>
-            The model estimates a
-            {{ "{:.1f}".format(result.probability_percent) }}%
-            probability of collision activity.
-        </p>
-    </article>
-
-    <article class="panel">
-        <span class="number">02</span>
-        <h3>Expected volume</h3>
-        <p>
-            The second stage estimates
-            {{ "{:.1f}".format(result.predicted_collision_count) }}
-            {{ result.unit }}.
-        </p>
-    </article>
-
-    <article class="panel">
-        <span class="number">03</span>
-        <h3>Recommended response</h3>
-        <p>{{ result.status }}.</p>
+        <small>{{ result.task_type }}</small>
     </article>
 </section>
 {% endif %}
