@@ -1078,12 +1078,39 @@ def dashboard():
     if not profile_ready():
         return redirect(url_for("city_profile"))
 
+    transportation_result = session.get("transportation_result")
+    energy_result = session.get("energy_result")
+    governance_result = session.get("governance_result")
+    waste_result = session.get("waste_result")
+
+    latest_result = None
+    available_results = [
+        result
+        for result in (
+            transportation_result,
+            energy_result,
+            governance_result,
+            waste_result,
+        )
+        if result
+    ]
+
+    if available_results:
+        latest_result = max(
+            available_results,
+            key=lambda result: result.get("created_at", ""),
+        )
+
     return render_template(
         "dashboard.html",
         profile=session["city_profile"],
         user_name=session.get("user_name", "User"),
-        results=active_results(),
-        waste=session.get("waste_result"),
+        results=available_results,
+        latest_result=latest_result,
+        transportation=transportation_result,
+        energy=energy_result,
+        governance=governance_result,
+        waste=waste_result,
     )
 
 
@@ -1265,11 +1292,35 @@ def reports():
     if not logged_in():
         return redirect(url_for("login"))
 
+    transportation_result = session.get("transportation_result")
+    energy_result = session.get("energy_result")
+    governance_result = session.get("governance_result")
+    waste_result = session.get("waste_result")
+
+    results = [
+        result
+        for result in (
+            transportation_result,
+            energy_result,
+            governance_result,
+            waste_result,
+        )
+        if result
+    ]
+
+    results.sort(
+        key=lambda result: result.get("created_at", ""),
+        reverse=True,
+    )
+
     return render_template(
         "reports.html",
         profile=session.get("city_profile", {}),
-        results=active_results(),
-        waste=session.get("waste_result"),
+        results=results,
+        transportation=transportation_result,
+        energy=energy_result,
+        governance=governance_result,
+        waste=waste_result,
     )
 
 
@@ -1279,23 +1330,136 @@ def download_report():
         return redirect(url_for("login"))
 
     profile = session.get("city_profile", {})
+    transportation = session.get("transportation_result")
+    energy = session.get("energy_result")
+    governance = session.get("governance_result")
     waste = session.get("waste_result")
 
-    waste_section = "<p>No waste assessment has been completed.</p>"
+    sections = []
+
+    if transportation:
+        sections.append(
+            f"""
+            <section class="report-section">
+                <h2>Transportation Outlook</h2>
+                <p><strong>Risk level:</strong>
+                    {html.escape(str(transportation.get('risk_level', 'N/A')))}
+                </p>
+                <p><strong>Collision probability:</strong>
+                    {float(transportation.get('probability_percent', 0)):.1f}%
+                </p>
+                <p><strong>Expected collisions:</strong>
+                    {float(transportation.get('predicted_collision_count', 0)):.1f}
+                    {html.escape(str(transportation.get('unit', 'collisions')))}
+                </p>
+                <p><strong>Status:</strong>
+                    {html.escape(str(transportation.get('status', '')))}
+                </p>
+                <p><strong>Model:</strong>
+                    {html.escape(str(transportation.get('model_name', '')))}
+                </p>
+            </section>
+            """
+        )
+
+    if energy:
+        sections.append(
+            f"""
+            <section class="report-section">
+                <h2>Energy Outlook</h2>
+                <p><strong>Predicted consumption:</strong>
+                    {html.escape(str(energy.get('displayed_prediction', energy.get('prediction', 'N/A'))))}
+                </p>
+                <p><strong>Demand level:</strong>
+                    {html.escape(str(energy.get('level', 'N/A')))}
+                </p>
+                <p><strong>Status:</strong>
+                    {html.escape(str(energy.get('status', '')))}
+                </p>
+                <p><strong>Target:</strong>
+                    {html.escape(str(energy.get('target_name', 'Prediction')))}
+                </p>
+                <p><strong>Model:</strong>
+                    {html.escape(str(energy.get('model_name', '')))}
+                </p>
+            </section>
+            """
+        )
+
+    if governance:
+        governance_prediction = governance.get(
+            "displayed_prediction",
+            governance.get("prediction", "N/A"),
+        )
+        confidence = governance.get("confidence")
+        confidence_line = (
+            f"<p><strong>Confidence:</strong> {float(confidence):.1f}%</p>"
+            if confidence is not None
+            else ""
+        )
+
+        sections.append(
+            f"""
+            <section class="report-section">
+                <h2>Public Services Outlook</h2>
+                <p><strong>Prediction:</strong>
+                    {html.escape(str(governance_prediction))}
+                </p>
+                <p><strong>Target:</strong>
+                    {html.escape(str(governance.get('target_name', 'Prediction')))}
+                </p>
+                {confidence_line}
+                <p><strong>Model:</strong>
+                    {html.escape(str(governance.get('model_name', '')))}
+                </p>
+            </section>
+            """
+        )
+
     if waste:
         actions = "".join(
-            f"<li><strong>{html.escape(title)}</strong>: {html.escape(text)}</li>"
-            for title, text in waste["actions"]
+            f"<li><strong>{html.escape(title)}</strong>: "
+            f"{html.escape(text)}</li>"
+            for title, text in waste.get("actions", [])
         )
-        waste_section = f"""
-        <h2>Waste Management Outlook</h2>
-        <p><strong>Area:</strong> {html.escape(waste['borough'])}, District {waste['district']}</p>
-        <p><strong>Forecast period:</strong> {html.escape(waste['month_name'])} {waste['year']}</p>
-        <p><strong>Expected waste:</strong> {waste['prediction']:,.0f} tons</p>
-        <p><strong>Change from last month:</strong> {waste['change_percent']:+.1f}%</p>
-        <p><strong>Planning status:</strong> {html.escape(waste['status'])}</p>
-        <ol>{actions}</ol>
-        """
+
+        sections.append(
+            f"""
+            <section class="report-section">
+                <h2>Waste Management Outlook</h2>
+                <p><strong>Area:</strong>
+                    {html.escape(str(waste.get('borough', '')))},
+                    District {waste.get('district', '')}
+                </p>
+                <p><strong>Forecast period:</strong>
+                    {html.escape(str(waste.get('month_name', '')))}
+                    {waste.get('year', '')}
+                </p>
+                <p><strong>Expected waste:</strong>
+                    {float(waste.get('prediction', 0)):,.0f} tons
+                </p>
+                <p><strong>Change from last month:</strong>
+                    {float(waste.get('change_percent', 0)):+.1f}%
+                </p>
+                <p><strong>Planning status:</strong>
+                    {html.escape(str(waste.get('status', '')))}
+                </p>
+                <ol>{actions}</ol>
+            </section>
+            """
+        )
+
+    if not sections:
+        sections.append(
+            """
+            <section class="report-section">
+                <h2>No completed assessments</h2>
+                <p>Complete a smart-city assessment before downloading the report.</p>
+            </section>
+            """
+        )
+
+    report_sections = "\n".join(sections)
 
     report = f"""
     <!doctype html>
@@ -1304,28 +1468,71 @@ def download_report():
         <meta charset="utf-8">
         <title>CityPulse AI Report</title>
         <style>
-            body{{font-family:Arial,sans-serif;max-width:900px;margin:40px auto;color:#142033;line-height:1.6}}
-            .head{{background:#0B2745;color:white;padding:28px;border-radius:18px}}
-            .meta{{background:#F3F6FA;padding:18px;border-radius:14px;margin:18px 0}}
+            body {{
+                font-family: Arial, sans-serif;
+                max-width: 900px;
+                margin: 40px auto;
+                color: #142033;
+                line-height: 1.6;
+            }}
+            .head {{
+                background: #0B2745;
+                color: white;
+                padding: 28px;
+                border-radius: 18px;
+            }}
+            .meta {{
+                background: #F3F6FA;
+                padding: 18px;
+                border-radius: 14px;
+                margin: 18px 0;
+            }}
+            .report-section {{
+                border: 1px solid #DCE4ED;
+                border-radius: 16px;
+                padding: 22px;
+                margin: 18px 0;
+            }}
+            .report-section h2 {{
+                margin-top: 0;
+                color: #0B2745;
+            }}
         </style>
     </head>
     <body>
         <div class="head">
             <h1>CityPulse AI Executive Report</h1>
-            <p>{html.escape(profile.get('city_name','City'))}, {html.escape(profile.get('country',''))}</p>
+            <p>
+                {html.escape(profile.get('city_name', 'City'))},
+                {html.escape(profile.get('country', ''))}
+            </p>
         </div>
+
         <div class="meta">
-            <strong>Prepared:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')}<br>
-            <strong>City manager:</strong> {html.escape(session.get('user_name',''))}
+            <strong>Prepared:</strong>
+            {datetime.now().strftime('%Y-%m-%d %H:%M')}<br>
+            <strong>City manager:</strong>
+            {html.escape(session.get('user_name', ''))}<br>
+            <strong>Completed assessments:</strong>
+            {len(active_results())}
         </div>
-        {waste_section}
+
+        {report_sections}
+
         <hr>
-        <small>Decision support only. Final operational decisions require human review.</small>
+        <small>
+            Decision support only. Final operational decisions require
+            human review.
+        </small>
     </body>
     </html>
     """
 
-    filename = f"CityPulse_{profile.get('city_name','City').replace(' ','_')}_Report.html"
+    filename = (
+        f"CityPulse_"
+        f"{profile.get('city_name', 'City').replace(' ', '_')}"
+        f"_Report.html"
+    )
 
     return send_file(
         BytesIO(report.encode("utf-8")),
