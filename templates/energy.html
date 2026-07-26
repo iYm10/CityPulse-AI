@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Energy | CityPulse AI{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">LIVE ENERGY FORECAST</span>
+        <h1>⚡ Energy Intelligence</h1>
+        <p>
+            Forecast electricity consumption using the exact 14 features
+            used when the Energy model was trained.
+        </p>
+    </div>
+
+    <span class="chip {{ 'live' if model_ready else 'waiting' }}">
+        {{ "Model connected" if model_ready else "Model not connected" }}
+    </span>
+</section>
+
+{% if not model_ready %}
+<section class="empty-state">
+    <div>⚡</div>
+    <h3>Energy model could not be connected</h3>
+    <p>
+        Confirm that <code>models/energy_bundle.joblib</code> exists
+        and that Render uses the same scikit-learn version used to save it.
+    </p>
+    {% if model_error %}
+        <pre>{{ model_error }}</pre>
+    {% endif %}
+</section>
+{% else %}
+
+<form class="panel form-grid" method="post">
+    <label>
+        Building
+        <select name="building_id" required>
+            {% for option in building_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Site
+        <select name="site_id" required>
+            {% for option in site_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Primary space usage
+        <select name="primaryspaceusage" required>
+            {% for option in usage_options %}
+                <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Floor area (sqm)
+        <input type="number" name="sqm" value="5000"
+               min="1" step="any" required>
+    </label>
+
+    <label>
+        Air temperature
+        <input type="number" name="airTemperature"
+               value="20" step="any" required>
+    </label>
+
+    <label>
+        Dew temperature
+        <input type="number" name="dewTemperature"
+               value="12" step="any" required>
+    </label>
+
+    <label>
+        Sea-level pressure
+        <input type="number" name="seaLvlPressure"
+               value="1015" step="any" required>
+    </label>
+
+    <label>
+        Wind direction
+        <input type="number" name="windDirection"
+               value="180" min="0" max="360" step="any" required>
+    </label>
+
+    <label>
+        Wind speed
+        <input type="number" name="windSpeed"
+               value="4" min="0" step="any" required>
+    </label>
+
+    <label>
+        Hour
+        <input type="number" name="hour"
+               value="12" min="0" max="23" required>
+    </label>
+
+    <label>
+        Day of week
+        <select name="day_of_week" required>
+            <option value="0">Monday</option>
+            <option value="1">Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+        </select>
+    </label>
+
+    <label>
+        Weekend
+        <select name="is_weekend" required>
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+        </select>
+    </label>
+
+    <label>
+        Month
+        <input type="number" name="month"
+               value="1" min="1" max="12" required>
+    </label>
+
+    <button class="full" type="submit">
+        Generate energy forecast
+    </button>
+</form>
+{% endif %}
+
+{% if result %}
+<section class="decision-card">
+    <span>ENERGY CONSUMPTION OUTLOOK</span>
+    <h2>{{ result.displayed_prediction }}</h2>
+    <p>
+        {{ result.status }} · Generated using {{ result.model_name }}
+    </p>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi">
+        <span>Predicted consumption</span>
+        <strong>{{ result.displayed_prediction }}</strong>
+        <small>{{ result.target_name }}</small>
+    </article>
+
+    <article class="kpi">
+        <span>Demand level</span>
+        <strong>{{ result.level }}</strong>
+        <small>Operational interpretation</small>
+    </article>
+
+    <article class="kpi">
+        <span>Model</span>
+        <strong>{{ result.model_name }}</strong>
+        <small>{{ result.task_type }}</small>
+    </article>
+
+    <article class="kpi">
+        <span>Generated</span>
+        <strong>{{ result.created_at[-5:] }}</strong>
+        <small>{{ result.created_at[:10] }}</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>Submitted inputs</h3>
+    <div class="two-grid">
+        {% for name, value in result.inputs.items() %}
+            <p><strong>{{ name }}:</strong> {{ value }}</p>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
