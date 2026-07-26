@@ -5,7 +5,7 @@
     <div>
         <span class="eyebrow dark">STAKEHOLDER OUTPUT</span>
         <h1>📄 Executive Reports</h1>
-        <p>Turn completed assessments into a clear city summary.</p>
+        <p>Review every completed city assessment in one executive summary.</p>
     </div>
 
     <span class="chip">{{ results|length }} assessment(s)</span>
@@ -25,33 +25,112 @@
     </article>
 
     <article class="kpi">
+        <span>Models represented</span>
+        <strong>{{ results|length }}</strong>
+        <small>Latest result from each module</small>
+    </article>
+
+    <article class="kpi">
         <span>Report status</span>
         <strong>{{ "Ready" if results else "Waiting" }}</strong>
         <small>Executive HTML report</small>
     </article>
 </section>
 
-{% if waste %}
-<section class="panel">
-    <h2>{{ waste.headline }}</h2>
-    <p>
-        The expected collection volume is
-        <strong>{{ "{:,.0f}".format(waste.prediction) }} tons</strong>
-        in {{ waste.borough }}, District {{ waste.district }},
-        for {{ waste.month_name }} {{ waste.year }}.
-    </p>
+{% if results %}
+<section class="module-grid result-grid">
+    {% if transportation %}
+    <article class="module-card result-card">
+        <div class="module-icon">🚦</div>
+        <span class="eyebrow dark">TRANSPORTATION REPORT</span>
+        <h3>{{ transportation.headline }}</h3>
+        <p>
+            Collision probability:
+            <strong>{{ "%.1f"|format(transportation.probability_percent) }}%</strong>
+        </p>
+        <p>
+            Expected collisions:
+            <strong>{{ "%.1f"|format(transportation.predicted_collision_count) }}</strong>
+            {{ transportation.unit }}
+        </p>
+        <p>{{ transportation.status }}</p>
+        <span class="status live">{{ transportation.risk_level }} risk</span>
+    </article>
+    {% endif %}
 
-    {% for title,text in waste.actions %}
-        <div class="action">
-            <span>{{ loop.index }}</span>
-            <div>
-                <strong>{{ title }}</strong>
-                <p>{{ text }}</p>
+    {% if energy %}
+    <article class="module-card result-card">
+        <div class="module-icon">⚡</div>
+        <span class="eyebrow dark">ENERGY REPORT</span>
+        <h3>{{ energy.status }}</h3>
+        <p>
+            Predicted consumption:
+            <strong>{{ energy.displayed_prediction }}</strong>
+        </p>
+        <p>
+            Demand level:
+            <strong>{{ energy.level }}</strong>
+        </p>
+        <span class="status live">{{ energy.model_name }}</span>
+    </article>
+    {% endif %}
+
+    {% if governance %}
+    <article class="module-card result-card">
+        <div class="module-icon">🏛️</div>
+        <span class="eyebrow dark">PUBLIC SERVICES REPORT</span>
+        <h3>{{ governance.displayed_prediction }}</h3>
+        <p>
+            Target:
+            <strong>{{ governance.target_name }}</strong>
+        </p>
+        {% if governance.confidence is not none %}
+        <p>
+            Confidence:
+            <strong>{{ "%.1f"|format(governance.confidence) }}%</strong>
+        </p>
+        {% endif %}
+        <span class="status live">{{ governance.model_name }}</span>
+    </article>
+    {% endif %}
+
+    {% if waste %}
+    <article class="module-card result-card">
+        <div class="module-icon">♻️</div>
+        <span class="eyebrow dark">WASTE REPORT</span>
+        <h3>{{ waste.headline }}</h3>
+        <p>
+            Expected collection volume:
+            <strong>{{ "{:,.0f}".format(waste.prediction) }} tons</strong>
+        </p>
+        <p>
+            {{ waste.borough }}, District {{ waste.district }} ·
+            {{ waste.month_name }} {{ waste.year }}
+        </p>
+        <span class="status live">{{ waste.priority }} priority</span>
+
+        {% for title,text in waste.actions %}
+            <div class="action">
+                <span>{{ loop.index }}</span>
+                <div>
+                    <strong>{{ title }}</strong>
+                    <p>{{ text }}</p>
+                </div>
             </div>
-        </div>
-    {% endfor %}
+        {% endfor %}
+    </article>
+    {% endif %}
+</section>
 
-    <a class="button" href="{{ url_for('download_report') }}">Download executive report</a>
+<section class="panel">
+    <h2>Download consolidated executive report</h2>
+    <p>
+        The downloaded report includes Transportation, Energy,
+        Public Services, and Waste results currently available in this session.
+    </p>
+    <a class="button" href="{{ url_for('download_report') }}">
+        Download executive report
+    </a>
 </section>
 {% else %}
 <section class="empty-state">
