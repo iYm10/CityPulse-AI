@@ -13,6 +13,7 @@ from flask import (
     flash,
     redirect,
     render_template,
+    render_template_string,
     request,
     send_file,
     session,
@@ -76,6 +77,317 @@ def active_results():
     ]
     return [session[key] for key in result_keys if session.get(key)]
 
+
+
+def get_model_bundle(module_name):
+    raw = MODEL_BUNDLES.get(module_name)
+
+    if raw is None:
+        return None
+
+    if isinstance(raw, dict):
+        model = raw.get("model") or raw.get("pipeline") or raw.get("estimator")
+        if model is None:
+            return None
+        bundle = dict(raw)
+        bundle["model"] = model
+        return bundle
+
+    if hasattr(raw, "predict"):
+        return {
+            "model": raw,
+            "feature_columns": list(getattr(raw, "feature_names_in_", [])),
+            "model_name": raw.__class__.__name__,
+            "task_type": "auto",
+        }
+
+    return None
+
+
+def get_bundle_features(bundle):
+    features = bundle.get("feature_columns") or bundle.get("features") or []
+    if not features:
+        features = list(getattr(bundle["model"], "feature_names_in_", []))
+    return [str(feature) for feature in features]
+
+
+def infer_field_schema(feature_name, bundle):
+    schemas = bundle.get("input_schema", {}) or {}
+    categories = bundle.get("categorical_options", {}) or {}
+    defaults = bundle.get("defaults", {}) or {}
+
+    schema = dict(schemas.get(feature_name, {}) or {})
+    options = schema.get("options") or categories.get(feature_name) or []
+    field_type = "select" if options else schema.get("type", "number")
+
+    return {
+        "name": feature_name,
+        "label": schema.get("label", feature_name.replace("_", " ").title()),
+        "type": field_type,
+        "default": schema.get("default", defaults.get(feature_name, "")),
+        "options": options,
+        "min": schema.get("min"),
+        "max": schema.get("max"),
+        "step": schema.get("step", 1),
+        "help": schema.get("help", ""),
+    }
+
+
+def convert_form_value(raw_value, field):
+    if field["type"] == "integer":
+        return int(float(raw_value))
+    if field["type"] == "number":
+        return float(raw_value)
+    return raw_value
+
+
+def prepare_generic_input(module_name, form_data):
+    bundle = get_model_bundle(module_name)
+    if not bundle:
+        raise ValueError(f"{module_name.title()} model bundle is not available.")
+
+    features = get_bundle_features(bundle)
+
+    if features:
+        row = {}
+        for feature in features:
+            field = infer_field_schema(feature, bundle)
+            raw_value = form_data.get(feature, "")
+            if raw_value == "":
+                raw_value = field["default"]
+            if raw_value == "":
+                raise ValueError(f'Enter a value for "{field["label"]}".')
+            row[feature] = convert_form_value(raw_value, field)
+
+        return pd.DataFrame([row], columns=features), row
+
+    raw_json = form_data.get("raw_json", "").strip()
+    if not raw_json:
+        raise ValueError(
+            "This bundle does not expose feature names. "
+            "Enter one JSON object containing the exact model inputs."
+        )
+
+    row = json.loads(raw_json)
+    if not isinstance(row, dict):
+        raise ValueError("The JSON input must be one object.")
+
+    return pd.DataFrame([row]), row
+
+
+def run_generic_prediction(module_name, form_data):
+    bundle = get_model_bundle(module_name)
+    if not bundle:
+        raise ValueError(f"{module_name.title()} model is not available.")
+
+    model = bundle["model"]
+    prepared_data, submitted_values = prepare_generic_input(module_name, form_data)
+    prediction = model.predict(prepared_data)[0]
+
+    if hasattr(prediction, "item"):
+        prediction = prediction.item()
+
+    confidence = None
+    if hasattr(model, "predict_proba"):
+        try:
+            confidence = float(max(model.predict_proba(prepared_data)[0])) * 100
+        except Exception:
+            confidence = None
+
+    labels = bundle.get("class_labels") or bundle.get("label_mapping") or {}
+    displayed_prediction = labels.get(
+        prediction,
+        labels.get(str(prediction), prediction),
+    )
+
+    return {
+        "module": module_name,
+        "module_title": {
+            "transportation": "Transportation",
+            "energy": "Energy",
+            "governance": "Public Services",
+        }.get(module_name, module_name.title()),
+        "prediction": prediction,
+        "displayed_prediction": displayed_prediction,
+        "confidence": confidence,
+        "target_name": bundle.get("target_name", "Prediction"),
+        "model_name": bundle.get("model_name", model.__class__.__name__),
+        "task_type": bundle.get("task_type", "auto"),
+        "inputs": submitted_values,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
+GENERIC_MODEL_TEMPLATE = """
+{% extends "base.html" %}
+{% block title %}{{ module_title }} | CityPulse AI{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow dark">LIVE MODEL</span>
+        <h1>{{ icon }} {{ module_title }}</h1>
+        <p>{{ subtitle }}</p>
+    </div>
+    <span class="chip {{ 'live' if model_ready else 'waiting' }}">
+        {{ "Model connected" if model_ready else "Model not connected" }}
+    </span>
+</section>
+
+{% if not model_ready %}
+<section class="empty-state">
+    <div>📦</div>
+    <h3>Add the {{ module_title }} model bundle</h3>
+    <p>Confirm that <code>{{ model_file }}</code> exists inside the models folder.</p>
+    {% if model_error %}<pre>{{ model_error }}</pre>{% endif %}
+</section>
+{% else %}
+<form class="panel form-grid" method="post">
+    {% if fields %}
+        {% for field in fields %}
+        <label>
+            {{ field.label }}
+            {% if field.type == "select" %}
+                <select name="{{ field.name }}" required>
+                    {% for option in field.options %}
+                    <option value="{{ option }}"
+                        {% if field.default|string == option|string %}selected{% endif %}>
+                        {{ option }}
+                    </option>
+                    {% endfor %}
+                </select>
+            {% elif field.type == "text" %}
+                <input type="text" name="{{ field.name }}" value="{{ field.default }}" required>
+            {% else %}
+                <input
+                    type="number"
+                    name="{{ field.name }}"
+                    value="{{ field.default }}"
+                    step="{{ field.step }}"
+                    {% if field.min is not none %}min="{{ field.min }}"{% endif %}
+                    {% if field.max is not none %}max="{{ field.max }}"{% endif %}
+                    required
+                >
+            {% endif %}
+            {% if field.help %}<small>{{ field.help }}</small>{% endif %}
+        </label>
+        {% endfor %}
+    {% else %}
+        <label class="full">
+            Model inputs as JSON
+            <textarea
+                name="raw_json"
+                rows="10"
+                placeholder='{"feature_1": 10, "feature_2": "value"}'
+                required
+            ></textarea>
+            <small>
+                This bundle does not expose feature_columns. Enter one JSON object
+                using the exact input names expected by the model.
+            </small>
+        </label>
+    {% endif %}
+    <button class="full" type="submit">Generate prediction</button>
+</form>
+{% endif %}
+
+{% if result %}
+<section class="decision-card">
+    <span>{{ result.target_name|upper }}</span>
+    <h2>{{ result.displayed_prediction }}</h2>
+    <p>
+        Generated using {{ result.model_name }}
+        {% if result.confidence is not none %}
+            · Confidence {{ "%.1f"|format(result.confidence) }}%
+        {% endif %}
+    </p>
+</section>
+
+<section class="kpi-grid">
+    <article class="kpi">
+        <span>Prediction</span>
+        <strong>{{ result.displayed_prediction }}</strong>
+        <small>{{ result.target_name }}</small>
+    </article>
+    <article class="kpi">
+        <span>Model</span>
+        <strong>{{ result.model_name }}</strong>
+        <small>{{ result.task_type }}</small>
+    </article>
+    <article class="kpi">
+        <span>Confidence</span>
+        <strong>
+            {% if result.confidence is not none %}
+                {{ "%.1f"|format(result.confidence) }}%
+            {% else %}
+                N/A
+            {% endif %}
+        </strong>
+        <small>Available for classifiers with predict_proba</small>
+    </article>
+    <article class="kpi">
+        <span>Generated</span>
+        <strong>{{ result.created_at[-5:] }}</strong>
+        <small>{{ result.created_at[:10] }}</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>Submitted inputs</h3>
+    <div class="two-grid">
+        {% for name, value in result.inputs.items() %}
+        <p><strong>{{ name|replace('_', ' ')|title }}:</strong> {{ value }}</p>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+"""
+
+
+def generic_model_page(module_name, module_title, icon, subtitle):
+    if not logged_in():
+        return redirect(url_for("login"))
+
+    if not profile_ready():
+        return redirect(url_for("city_profile"))
+
+    bundle = get_model_bundle(module_name)
+    fields = []
+
+    if bundle:
+        fields = [
+            infer_field_schema(feature, bundle)
+            for feature in get_bundle_features(bundle)
+        ]
+
+    result_key = f"{module_name}_result"
+    result = session.get(result_key)
+
+    if request.method == "POST":
+        try:
+            result = run_generic_prediction(module_name, request.form)
+            session[result_key] = result
+
+            history = session.get("prediction_history", [])
+            history.append(result)
+            session["prediction_history"] = history[-20:]
+
+            flash(f"{module_title} prediction generated successfully.", "success")
+        except Exception as error:
+            flash(str(error), "error")
+
+    return render_template_string(
+        GENERIC_MODEL_TEMPLATE,
+        module_name=module_name,
+        module_title=module_title,
+        icon=icon,
+        subtitle=subtitle,
+        model_ready=bundle is not None,
+        model_file=MODEL_FILES[module_name],
+        model_error=MODEL_ERRORS.get(module_name),
+        fields=fields,
+        result=result,
+    )
 
 def get_waste_bundle():
     bundle = MODEL_BUNDLES.get("waste")
@@ -384,39 +696,33 @@ def dashboard():
     )
 
 
-@app.route("/transportation")
+@app.route("/transportation", methods=["GET", "POST"])
 def transportation():
-    if not logged_in():
-        return redirect(url_for("login"))
-    return render_template(
-        "module_placeholder.html",
-        module="Transportation",
-        module_key="transportation",
+    return generic_model_page(
+        module_name="transportation",
+        module_title="Transportation",
         icon="🚦",
+        subtitle="Use the connected model to generate a mobility or road-risk prediction.",
     )
 
 
-@app.route("/energy")
+@app.route("/energy", methods=["GET", "POST"])
 def energy():
-    if not logged_in():
-        return redirect(url_for("login"))
-    return render_template(
-        "module_placeholder.html",
-        module="Energy",
-        module_key="energy",
+    return generic_model_page(
+        module_name="energy",
+        module_title="Energy",
         icon="⚡",
+        subtitle="Use the connected model to forecast energy demand or consumption.",
     )
 
 
-@app.route("/public-services")
+@app.route("/public-services", methods=["GET", "POST"])
 def public_services():
-    if not logged_in():
-        return redirect(url_for("login"))
-    return render_template(
-        "module_placeholder.html",
-        module="Public Services",
-        module_key="governance",
+    return generic_model_page(
+        module_name="governance",
+        module_title="Public Services",
         icon="🏛️",
+        subtitle="Use the connected model to prioritize or assess public-service requests.",
     )
 
 
