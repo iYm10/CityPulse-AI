@@ -4,30 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}CityPulse AI{% endblock %}</title>
-    <meta name="description" content="AI-powered smart city decision support platform">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <meta name="description"
+          content="AI-powered smart city decision support platform">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+    <script defer
+            src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-{% if session.get('logged_in') %}
+
+{% if session.get("logged_in") %}
 <header class="topbar">
     <a class="brand" href="{{ url_for('dashboard') }}">
         <span class="brand-mark">CP</span>
         <span>CityPulse AI</span>
     </a>
 
-    <button class="menu-toggle" type="button" aria-label="Open navigation">☰</button>
+    <button class="menu-toggle"
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded="false">
+        ☰
+    </button>
 
     <nav class="nav-links">
-        <a href="{{ url_for('dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('transportation') }}">Transportation</a>
-        <a href="{{ url_for('energy') }}">Energy</a>
-        <a href="{{ url_for('public_services') }}">Public Services</a>
-        <a href="{{ url_for('waste') }}">Waste</a>
-        <a href="{{ url_for('advisor') }}">AI Advisor</a>
-        <a href="{{ url_for('reports') }}">Reports</a>
-        <a href="{{ url_for('profile') }}">Profile</a>
+        <a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}"
+           href="{{ url_for('dashboard') }}">Dashboard</a>
+
+        <a class="{{ 'active' if request.endpoint == 'transportation' else '' }}"
+           href="{{ url_for('transportation') }}">Transportation</a>
+
+        <a class="{{ 'active' if request.endpoint == 'energy' else '' }}"
+           href="{{ url_for('energy') }}">Energy</a>
+
+        <a class="{{ 'active' if request.endpoint == 'public_services' else '' }}"
+           href="{{ url_for('public_services') }}">Public Services</a>
+
+        <a class="{{ 'active' if request.endpoint == 'waste' else '' }}"
+           href="{{ url_for('waste') }}">Waste</a>
+
+        <a class="{{ 'active' if request.endpoint == 'advisor' else '' }}"
+           href="{{ url_for('advisor') }}">AI Advisor</a>
+
+        <a class="{{ 'active' if request.endpoint == 'reports' else '' }}"
+           href="{{ url_for('reports') }}">Reports</a>
+
+        <a class="{{ 'active' if request.endpoint == 'profile' else '' }}"
+           href="{{ url_for('profile') }}">Profile</a>
+
+        <a href="{{ url_for('logout') }}">Logout</a>
     </nav>
 </header>
 {% endif %}
@@ -46,5 +72,22 @@
     <span>CityPulse AI</span>
     <span>Decision support platform · {{ current_year }}</span>
 </footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const button = document.querySelector(".menu-toggle");
+    const navigation = document.querySelector(".nav-links");
+
+    if (!button || !navigation) return;
+
+    button.addEventListener("click", function () {
+        navigation.classList.toggle("open");
+        button.setAttribute(
+            "aria-expanded",
+            navigation.classList.contains("open") ? "true" : "false"
+        );
+    });
+});
+</script>
 </body>
 </html>
