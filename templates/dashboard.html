@@ -37,9 +37,17 @@
     </article>
 
     <article class="kpi">
-        <span>Latest priority</span>
-        <strong>{{ waste.priority if waste else "Not assessed" }}</strong>
-        <small>Based on model output</small>
+        <span>Latest assessment</span>
+        <strong>
+            {% if latest_result %}
+                {{ latest_result.get('module_title', latest_result.get('module', 'Assessment')) }}
+            {% else %}
+                Not assessed
+            {% endif %}
+        </strong>
+        <small>
+            {{ latest_result.created_at if latest_result else "Run a smart-city module" }}
+        </small>
     </article>
 </section>
 
@@ -73,20 +81,81 @@
 <div class="section-heading">
     <div>
         <span class="eyebrow dark">EXECUTIVE BRIEF</span>
-        <h2>Latest operational outlook</h2>
+        <h2>Latest operational outlooks</h2>
     </div>
+
+    {% if results %}
+        <a class="button" href="{{ url_for('reports') }}">View all reports</a>
+    {% endif %}
 </div>
 
-{% if waste %}
-<section class="decision-card">
-    <span>MONTHLY PLANNING OUTLOOK</span>
-    <h2>{{ waste.headline }}</h2>
-    <p>
-        {{ waste.borough }}, District {{ waste.district }} ·
-        {{ waste.month_name }} {{ waste.year }} ·
-        Expected {{ "{:,.0f}".format(waste.prediction) }} tons
-    </p>
-    <a class="button light" href="{{ url_for('advisor') }}">Ask the AI advisor</a>
+{% if results %}
+<section class="module-grid result-grid">
+    {% if transportation %}
+    <article class="module-card result-card">
+        <div class="module-icon">🚦</div>
+        <span class="eyebrow dark">TRANSPORTATION</span>
+        <h3>{{ transportation.headline }}</h3>
+        <p>
+            Collision probability:
+            <strong>{{ "%.1f"|format(transportation.probability_percent) }}%</strong>
+            · Expected:
+            <strong>{{ "%.1f"|format(transportation.predicted_collision_count) }}</strong>
+            {{ transportation.unit }}
+        </p>
+        <span class="status live">{{ transportation.risk_level }} risk</span>
+        <a class="button" href="{{ url_for('transportation') }}">Open assessment</a>
+    </article>
+    {% endif %}
+
+    {% if energy %}
+    <article class="module-card result-card">
+        <div class="module-icon">⚡</div>
+        <span class="eyebrow dark">ENERGY</span>
+        <h3>{{ energy.status }}</h3>
+        <p>
+            Predicted consumption:
+            <strong>{{ energy.displayed_prediction }}</strong>
+            · Demand level:
+            <strong>{{ energy.level }}</strong>
+        </p>
+        <span class="status live">{{ energy.model_name }}</span>
+        <a class="button" href="{{ url_for('energy') }}">Open forecast</a>
+    </article>
+    {% endif %}
+
+    {% if governance %}
+    <article class="module-card result-card">
+        <div class="module-icon">🏛️</div>
+        <span class="eyebrow dark">PUBLIC SERVICES</span>
+        <h3>
+            {{ governance.displayed_prediction }}
+        </h3>
+        <p>
+            {{ governance.target_name }}
+            {% if governance.confidence is not none %}
+                · Confidence:
+                <strong>{{ "%.1f"|format(governance.confidence) }}%</strong>
+            {% endif %}
+        </p>
+        <span class="status live">{{ governance.model_name }}</span>
+        <a class="button" href="{{ url_for('public_services') }}">Open assessment</a>
+    </article>
+    {% endif %}
+
+    {% if waste %}
+    <article class="module-card result-card">
+        <div class="module-icon">♻️</div>
+        <span class="eyebrow dark">WASTE PLANNING</span>
+        <h3>{{ waste.headline }}</h3>
+        <p>
+            {{ waste.borough }}, District {{ waste.district }} ·
+            Expected <strong>{{ "{:,.0f}".format(waste.prediction) }} tons</strong>
+        </p>
+        <span class="status live">{{ waste.priority }} priority</span>
+        <a class="button" href="{{ url_for('waste') }}">Open forecast</a>
+    </article>
+    {% endif %}
 </section>
 {% else %}
 <section class="empty-state">
